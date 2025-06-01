@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>fillaDb Admin</title>
+  <style>
+    body { background: #f6fafd; font-family: 'Segoe UI', Arial, sans-serif; color: #222; margin: 0; padding: 0; min-height: 100vh; }
+    .admin-container { width: 100%; max-width: 720px; margin: 40px auto 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 6px 24px rgba(44, 100, 144, 0.10); padding: 2.2rem; text-align: left; }
+    h2 { color: #1976D2; margin-bottom: 1.4rem; text-align: center; }
+    label { font-weight: 600; margin-bottom: 0.28rem; display: block;}
+    input[type="text"], input[type="password"] { width: 96%; padding: 0.5rem; margin-bottom: 0.7rem; border: 1px solid #b5ccdc; border-radius: 6px; font-size: 1rem; background: #f3f8fa; }
+    input[type="submit"], button { background: linear-gradient(90deg, #1976D2 60%, #39b77e 100%); color: #fff; font-weight: bold; border: none; border-radius: 6px; padding: 0.52rem 1.4rem; cursor: pointer; margin-top: 0.2rem; margin-bottom: 0.4rem; }
+    input[type="submit"]:hover, button:hover { background: linear-gradient(90deg, #1565c0 60%, #219150 100%);}
+    .tabbar { display: flex; margin-bottom: 2.1rem;}
+    .tabbar a { flex:1; text-align:center; text-decoration:none; color:#1976D2; font-weight:600; padding: 0.75rem 0; background: #e9f2fc; border-radius: 7px 7px 0 0; margin-right:4px;}
+    .tabbar a.active { background: #fff; color:#219150; border-bottom: 3px solid #219150;}
+    .success { color: #219150; margin-bottom: 0.6rem; }
+    .error { color: #c62828; margin-bottom: 0.5rem;}
+    .token-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.1rem; }
+    #token { letter-spacing: 0.07em;}
+    .logout-form { text-align: right; }
+    .coll-list { margin: 0.2rem 0 1.4rem 0; }
+    .coll-list li { margin-bottom: 0.33rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.97rem;}
+    th, td { border: 1px solid #c3e2f6; padding: 0.48rem; }
+    th { background: #e9f2fc; color: #1976D2; }
+    tr:nth-child(even) { background: #f5fbfe;}
+    .footer { text-align: center; color: #b5ccdc; font-size: 0.92rem; margin-top: 30px;}
+  </style>
+</head>
+<body>
+<div class="admin-container">
+  <h2>fillaDb Admin Panel</h2>
+  <form method="post" action="{{ url_for('admin_logout') }}" class="logout-form"><input type="submit" value="Logout" /></form>
+  <div class="tabbar">
+    <a href="?tab=dashboard" class="{{'active' if tab=='dashboard' else ''}}">Dashboard</a>
+    <a href="?tab=collections" class="{{'active' if tab=='collections' else ''}}">Collections</a>
+    <a href="?tab=docs{{'&col='+selected_col if selected_col else ''}}" class="{{'active' if tab=='docs' else ''}}">Documents</a>
+    <a href="?tab=token" class="{{'active' if tab=='token' else ''}}">API Token</a>
+    <a href="?tab=password" class="{{'active' if tab=='password' else ''}}">Password</a>
+  </div>
+  {% if message %}<div class="success">{{message}}</div>{% endif %}
+  {% if error %}<div class="error">{{error}}</div>{% endif %}
+
+  {% if tab == 'dashboard' %}
+    <p>Welcome to the <b>fillaDb</b> admin dashboard. Use the tabs above to manage API tokens, your password, collections, or documents.</p>
+    <ul>
+      <li>Total collections: <b>{{collections|length}}</b></li>
+      <li>First 3 collections: {% for c in collections[:3] %}<code>{{c}}</code> {% endfor %}</li>
+    </ul>
+  {% elif tab == 'collections' %}
+    <h3>All Collections</h3>
+    <ul class="coll-list">
+      {% for col in collections %}
+        <li>
+          <a href="?tab=docs&col={{col}}"><b>{{col}}</b></a>
+        </li>
+      {% else %}
+        <li><i>No collections found.</i></li>
+      {% endfor %}
+    </ul>
+  {% elif tab == 'docs' %}
+    <h3>Browse Documents</h3>
+    <form method="get">
+      <input type="hidden" name="tab" value="docs">
+      <label>Select Collection:</label>
+      <select name="col" onchange="this.form.submit()">
+        <option value="">-- choose --</option>
+        {% for col in collections %}
+          <option value="{{col}}" {% if col==selected_col %}selected{% endif %}>{{col}}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% if selected_col %}
+      <h4>Collection: <code>{{selected_col}}</code></h4>
+      {% if docs %}
+      <table>
+        <tr>{% for k in columns %}<th>{{k}}</th>{% endfor %}</tr>
+        {% for doc in docs %}
+        <tr>{% for k in columns %}<td>{{doc.get(k, '')}}</td>{% endfor %}</tr>
+        {% endfor %}
+      </table>
+      {% else %}
+        <p><i>No documents in collection.</i></p>
+      {% endif %}
+    {% endif %}
+  {% elif tab == 'token' %}
+    <form method="post">
+      <input type="hidden" name="action" value="change_token">
+      <div class="token-row">
+        <label>Current API Token:</label>
+        <input type="password" value="{{token_value}}" id="token" readonly>
+        <button type="button" onclick="toggleToken()">Show/Hide</button>
+      </div>
+      <label>New API Token:</label>
+      <input type="text" name="new_token" placeholder="Enter new API token" required>
+      <input type="submit" value="Update Token">
+    </form>
+    <script>function toggleToken() {
+      var token = document.getElementById('token');
+      token.type = token.type === 'password' ? 'text' : 'password';
+    }</script>
+  {% elif tab == 'password' %}
+    <form method="post">
+      <input type="hidden" name="action" value="change_pass">
+      <label>Current Password:</label>
+      <input type="password" name="current_pass" required>
+      <label>New Password:</label>
+      <input type="password" name="new_pass" required>
+      <label>Confirm New Password:</label>
+      <input type="password" name="confirm_pass" required>
+      <input type="submit" value="Change Password">
+    </form>
+  {% endif %}
+  <div class="footer">© 2025 Arnold Lartey &bull; 3D PLUS GH</div>
+</div>
+</body>
+</html>
